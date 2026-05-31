@@ -124,3 +124,63 @@ def search_events_by_artist(artist_name):
         event_obj = MusicEvent(row["title"], row["location"], row["price"], lineup, row["organiser_name"])
         events_list.append(event_obj)
     return events_list
+
+
+def buy_ticket(user_id, event_id):
+    import uuid
+    from datetime import datetime
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT * FROM events WHERE id = ?", (event_id,))
+        event = cursor.fetchone()
+        if event is None:
+            return {"success": False, "error": "Event not found."}
+        if event["tickets_sold"] >= event["tickets_total"]:
+            return {"success": False, "error": "This event is sold out."}
+        cursor.execute(
+            "SELECT id FROM tickets WHERE user_id = ? AND event_id = ?",
+            (user_id, event_id)
+        )
+        if cursor.fetchone():
+            return {"success": False, "error": "You already have a ticket for this event."}
+        ticket_code   = f"TKT-{uuid.uuid4().hex[:8].upper()}"
+        purchase_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO tickets (user_id, event_id, ticket_code, purchase_date, price_paid)
+            VALUES (?, ?, ?, ?, ?)
+        """, (user_id, event_id, ticket_code, purchase_date, event["price"]))
+        cursor.execute(
+            "UPDATE events SET tickets_sold = tickets_sold + 1 WHERE id = ?",
+            (event_id,)
+        )
+        conn.commit()
+        return {
+            "success": True,
+            "ticket_code": ticket_code,
+            "event": event["title"],
+            "location": event["location"],
+            "price_paid": event["price"],
+            "purchase_date": purchase_date,
+        }
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "error": str(e)}
+    finally:
+        conn.close()
+
+
+def get_user_tickets(user_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT t.ticket_code, t.purchase_date, t.price_paid,
+               e.title, e.location, e.organiser_name
+        FROM tickets t
+        JOIN events e ON t.event_id = e.id
+        WHERE t.user_id = ?
+        ORDER BY t.purchase_date DESC
+    """, (user_id,))
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]

@@ -1,0 +1,7 @@
+README.md
+pyproject.toml
+setup.py
+event_manager/music_event_app.egg-info/PKG-INFO
+event_manager/music_event_app.egg-info/SOURCES.txt
+event_manager/music_event_app.egg-info/dependency_links.txt
+event_manager/music_event_app.egg-info/top_level.txt

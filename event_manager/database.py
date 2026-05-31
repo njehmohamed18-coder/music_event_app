@@ -5,23 +5,56 @@ import sqlite3
 DB_NAME = "music_events.db"
 
 def init_db():
-    """Initializes the SQLite database and creates the events table if it doesn't exist."""
-    conn = sqlite3.connect(DB_NAME)
+    conn = get_connection()
     cursor = conn.cursor()
-    
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS events (
+
+    # existing events table stays as-is ...
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            location TEXT NOT NULL,
-            price REAL NOT NULL,
-            lineup TEXT NOT NULL,
-            organizer TEXT NOT NULL
+            username TEXT UNIQUE NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            role TEXT NOT NULL CHECK(role IN ('user', 'organiser')),
+            company_name TEXT,
+            description TEXT
         )
-    ''')
-    
+    """)
+
     conn.commit()
     conn.close()
+
+def register_user(username, email, password, role, company_name=None, description=None):
+    """Saves a new user to the database. Returns True on success, False if email/username already exists."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("""
+            INSERT INTO users (username, email, password, role, company_name, description)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (username, email, password, role, company_name, description))
+        conn.commit()
+        return True
+    except sqlite3.IntegrityError:
+        # username or email already taken
+        return False
+    finally:
+        conn.close()
+
+
+def login_user(email, password):
+    """Returns the user row as a dict if credentials match, otherwise None."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM users WHERE email = ? AND password = ?",
+        (email, password)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
 
 def save_event(event):
     """Takes a MusicEvent object, serializes the lineup list to a string, and saves it."""

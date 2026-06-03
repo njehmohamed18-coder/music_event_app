@@ -20,7 +20,7 @@ cd mohamednjahsamplepackage
 pip install -r requirements.txt
 
 # Run the app
-python main.py
+python3 main.py
 ```
 
 ## Running Tests
